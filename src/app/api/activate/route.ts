@@ -38,7 +38,7 @@ async function handleActivate(req: NextRequest) {
     return NextResponse.json({ error: '激活码不存在，请确认后重试' }, { status: 404 })
   }
 
-  // 已过期
+  // 已过期（仅当 expires_at 有值且已过期时拒绝）
   if (activation.expires_at && new Date(activation.expires_at) < new Date()) {
     return NextResponse.json({ error: '激活码已过期，请联系客服续期' }, { status: 403 })
   }
@@ -49,11 +49,11 @@ async function handleActivate(req: NextRequest) {
     if (activation.browser_fingerprint !== fingerprint) {
       return NextResponse.json({ error: DEVICE_CONFLICT_MSG }, { status: 403 })
     }
-    // 同设备回来 → 直接返回已有 session，无需校验姓名（设备本身即凭证）
+    // 同设备回来 → 直接返回已有 session
     return NextResponse.json({
       success: true,
       student_name: activation.student_name,
-      exam_level: activation.exam_level,
+      exam_level: activation.activated_level || activation.exam_level,
       session_id: activation.session_id,
       already_activated: true,
     })
@@ -61,21 +61,23 @@ async function handleActivate(req: NextRequest) {
 
   // ── 首次激活 ──────────────────────────────────────────────
 
-  // 需要选择级别
-  if (!exam_level || !['ACC', 'PCC', 'MCC'].includes(exam_level)) {
+  // 确定最终级别：优先用预设级别，否则用学员选择的级别
+  const finalLevel: string = activation.exam_level || exam_level || ''
+
+  if (!finalLevel || !['ACC', 'PCC', 'MCC'].includes(finalLevel)) {
+    // 未预设级别且学员未提供 → 让学员选择
     return NextResponse.json({ needs_level_selection: true, student_name: name }, { status: 200 })
   }
 
   const now = new Date()
-  const expiresAt = new Date(now)
-  expiresAt.setMonth(expiresAt.getMonth() + 6)
+  const expiresAt = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000) // 激活日起 6 个月
 
   // 创建 session
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .insert({
       activation_code_id: activation.id,
-      exam_level: exam_level as ExamLevel,
+      exam_level: finalLevel as ExamLevel,
       browser_fingerprint: fingerprint,
       started_at: now.toISOString(),
       last_active_at: now.toISOString(),
@@ -87,7 +89,7 @@ async function handleActivate(req: NextRequest) {
     return NextResponse.json({ error: '创建会话失败，请重试' }, { status: 500 })
   }
 
-  // 写入激活信息（含姓名）
+  // 写入激活信息
   await supabase
     .from('activation_codes')
     .update({
@@ -96,15 +98,16 @@ async function handleActivate(req: NextRequest) {
       browser_fingerprint: fingerprint,
       activated_at: now.toISOString(),
       expires_at: expiresAt.toISOString(),
-      exam_level,
+      activated_level: finalLevel,   // 学员实际使用的级别（新字段）
       session_id: session.id,
+      // exam_level 保持原值不覆盖（运营预设字段）
     })
     .eq('id', activation.id)
 
   return NextResponse.json({
     success: true,
     student_name: name,
-    exam_level,
+    exam_level: finalLevel,
     session_id: session.id,
     already_activated: false,
   })
