@@ -6,6 +6,15 @@ const DEVICE_CONFLICT_MSG =
   '此激活码已在其他设备使用，如需更换设备请添加微信客服'
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handleActivate(req)
+  } catch (e) {
+    console.error('[activate] unhandled error:', e)
+    return NextResponse.json({ error: '服务器内部错误，请稍后重试' }, { status: 500 })
+  }
+}
+
+async function handleActivate(req: NextRequest) {
   const { code, student_name, fingerprint, exam_level } = await req.json()
 
   if (!code || !fingerprint || !student_name?.trim()) {
