@@ -132,26 +132,73 @@ function detectIntent(text: string): 'target-weak' | 'weak' | 'report' | null {
 }
 
 function buildAutoReportPrompt(answers: LocalAnswer[], count: number): string {
-  const stats: Record<string, { total: number; correct: number; scenario: number }> = {}
+  const stats: Record<string, { total: number; correct: number; wrong: number; scenario: number }> = {}
   for (const a of answers) {
-    if (!stats[a.competency]) stats[a.competency] = { total: 0, correct: 0, scenario: 0 }
+    if (!stats[a.competency]) stats[a.competency] = { total: 0, correct: 0, wrong: 0, scenario: 0 }
     stats[a.competency].total++
     if (a.isCorrect === true) stats[a.competency].correct++
+    if (a.isCorrect === false) stats[a.competency].wrong++
     if (a.questionType === 'sjt') stats[a.competency].scenario++
   }
+
   const knowledgeAnswers = answers.filter(a => a.questionType === 'knowledge')
-  const correctCount = knowledgeAnswers.filter(a => a.isCorrect).length
-  const statsText = Object.entries(stats)
-    .map(([c, s]) => `${c}：共${s.total}题${s.scenario > 0 ? `（含${s.scenario}道情景题）` : ''}${s.total - s.scenario > 0 ? `，知识类答对${s.correct}题` : ''}`)
+  const sjtAnswers = answers.filter(a => a.questionType === 'sjt')
+  const correctCount = knowledgeAnswers.filter(a => a.isCorrect === true).length
+  const correctRate = knowledgeAnswers.length > 0
+    ? Math.round(correctCount / knowledgeAnswers.length * 100)
+    : null
+
+  // 在客户端计算弱项，不让 AI 自行判断
+  const weakItems = Object.entries(stats)
+    .filter(([, s]) => s.wrong > 0)
+    .sort((a, b) => b[1].wrong / b[1].total - a[1].wrong / a[1].total)
+    .map(([c, s]) => `${c}（答错${s.wrong}/${s.total}题）`)
+
+  const statsLines = Object.entries(stats)
+    .map(([c, s]) => {
+      const kCount = s.total - s.scenario
+      return `${c}：共${s.total}题${s.scenario > 0 ? `（含${s.scenario}道情景题）` : ''}${kCount > 0 ? `，知识类答对${s.correct}/${kCount}题` : ''}`
+    })
     .join('\n')
-  return `学员完成第${count}道题里程碑，请生成简短的学习报告。\n\n答题概况：\n总计${answers.length}题，知识类答对率${knowledgeAnswers.length > 0 ? Math.round(correctCount / knowledgeAnswers.length * 100) : 'N/A'}%\n\n各能力项：\n${statsText}\n\n请用温暖鼓励的语气给出150字以内的学习报告，包含：①进步亮点 ②重点加强方向 ③下一步建议。报告结尾加分隔线后继续出下一题。`
+
+  const weakSection = weakItems.length === 0
+    ? '【建议】本轮练习表现优秀，继续保持！'
+    : `【需要加强】${weakItems.join('、')}\n【建议】请重点复习上述能力项的核心概念。`
+
+  return `请生成学习报告（严格基于以下数据，不得编造）。
+
+【答题数据】
+本轮练习：共${answers.length}题（知识类${knowledgeAnswers.length}题 / 情景类${sjtAnswers.length}题）
+${correctRate !== null ? `知识类正确率：${correctRate}%（答对${correctCount}/${knowledgeAnswers.length}题）` : ''}
+
+各能力项明细：
+${statsLines}
+
+${weakSection}
+
+请按以下格式输出报告，只使用上方提供的数据，不得推断或编造未出现在数据中的弱点：
+
+📊 学习报告
+
+本轮练习：共${answers.length}题（知识类${knowledgeAnswers.length}题 / 情景类${sjtAnswers.length}题）
+${correctRate !== null ? `知识类正确率：${correctRate}%` : ''}
+${sjtAnswers.length > 0 ? `情景类：已完成${sjtAnswers.length}题` : ''}
+
+重点练习的能力项：（从数据中列出）
+
+${weakItems.length === 0 ? '本轮练习表现优秀，继续保持！' : `需要加强：${weakItems.join('、')}`}
+
+建议：（根据数据给出1-2句，全对时写鼓励语）
+
+---
+说"下一题"继续练习，或说"针对薄弱点出题"进行强化。`
 }
 
 function buildConsistencyPrompt(scenarios: ScenarioInteraction[]): string {
   const pairs = scenarios.map((s, i) =>
     `【第${i + 1}题 · ${s.competency}】\n题目：${s.question.slice(0, 200)}...\n学员排序：${s.userAnswer}\n参考分析要点：${s.explanation.slice(0, 300)}...`
   ).join('\n\n')
-  return `请对学员最近${scenarios.length}道情景题的作答进行一致性分析：\n\n${pairs}\n\n分析要求：\n1. 找出学员在相似场景（如教练情绪管理、边界处理等）的判断是否前后一致\n2. 如有矛盾，用"我注意到"而非"你前后矛盾"的语气指出\n3. 给出一条具体的提升建议\n4. 分析控制在150字内，结尾出一道相关能力的题目`
+  return `请对学员最近${scenarios.length}道情景题的作答进行一致性分析：\n\n${pairs}\n\n分析要求：\n1. 找出学员在相似场景（如教练情绪管理、边界处理等）的判断是否前后一致\n2. 如有矛盾，用"我注意到"而非"你前后矛盾"的语气指出\n3. 给出一条具体的提升建议\n4. 分析控制在150字内，分析结束后不出任何新题，最后一句只写：说"下一题"继续练习。`
 }
 
 // ─── Selection Screen ─────────────────────────────────────────────────────────
