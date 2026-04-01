@@ -632,6 +632,11 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
       const updated: APIMessage[] = [...newHistory, { role: 'assistant' as const, content }]
       setHistory(updated)
       historyRef.current = updated
+
+      // 报告/分析响应后强制重置答题等待状态，防止 AI 偷加题目触发 isWaiting
+      if (intent === 'weak' || intent === 'report') {
+        setIsWaiting(false)
+      }
     } catch {
       setMessages(prev => [...prev, {
         id: uid(), role: 'assistant', type: 'assistant',
@@ -670,6 +675,8 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
         ]
         setHistory(updated)
         historyRef.current = updated
+        // 自动触发的报告/分析后同样强制重置答题等待状态
+        setIsWaiting(false)
       }
     } catch { /* silent */ }
     finally { setLoading(false) }

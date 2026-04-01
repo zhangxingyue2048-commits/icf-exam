@@ -120,35 +120,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '参数缺失' }, { status: 400 })
   }
 
-  const QUESTION_RULES = `
-【核心规则 — 每次只做一件事】
-- 出题时只出题，解析时只给解析，报告时只输出报告，分析时只输出分析，绝对不能混在一起
-- 出完题后禁止附加任何上一题的结束语
-- 输出分析或报告后，绝对不出任何新题
+  const REPORT_SYSTEM = buildSystemPrompt(level as Level) + `
 
-【出题结尾格式（必须严格遵守）】
-- 情景题结尾：请分别选出最佳和最差操作（填字母即可），提交后我将为你提供详细解析。
-- 知识类题结尾：请选出正确答案（填字母即可）。
+════════════════════════════════════════
+【最高优先级 · 绝对禁令】
+════════════════════════════════════════
+你现在的唯一任务是输出报告或分析。
+输出完成后，最后一行只能是：
+  说"下一题"继续练习，或说"针对薄弱点出题"进行强化。
 
-【薄弱点分析规则】
-当用户请求薄弱点分析时，只输出分析报告，分析结束后绝对不出任何新题。
-报告格式如下（严格遵守）：
+以下行为被绝对禁止，违反即为错误输出：
+❌ 在报告/分析后附加任何题目（包括知识题、情景题）
+❌ 出现"请选出正确答案"、"填字母即可"、"最佳操作"等任何出题字样
+❌ 在报告正文之外输出任何与报告无关的内容
+════════════════════════════════════════
+
+【薄弱点分析格式】
 📊 薄弱点分析
 
 本轮练习：共X题（知识类X题 / 情景类X题）
 重点练习的能力项：（列出涉及的CC项）
 
 需要加强的方向：
-· （具体能力项）：（说明为什么需要加强，答错了哪类题）
+· （具体能力项）：（说明为什么需要加强）
 
 建议：（1-2句具体学习建议）
 
 ---
-需要我针对薄弱点出题强化练习吗？
+说"下一题"继续练习，或说"针对薄弱点出题"进行强化。
 
-【学习报告规则】
-当用户请求学习报告时，只输出报告，报告结束后绝对不出任何新题。
-报告格式如下（严格遵守）：
+【学习报告格式】
 📊 学习报告
 
 本轮练习：共X题（知识类X题 / 情景类X题）
@@ -160,7 +161,16 @@ export async function POST(req: NextRequest) {
 建议加强：（根据答错的题或能力项给出具体建议）
 
 ---
-说"下一题"继续练习，或说"针对薄弱点出题"进行强化。
+说"下一题"继续练习，或说"针对薄弱点出题"进行强化。`
+
+  const QUESTION_RULES = `
+【核心规则 — 每次只做一件事】
+- 出题时只出题，解析时只给解析，绝对不能混在一起
+- 出完题后禁止附加任何上一题的结束语
+
+【出题结尾格式（必须严格遵守）】
+- 情景题结尾：请分别选出最佳和最差操作（填字母即可），提交后我将为你提供详细解析。
+- 知识类题结尾：请选出正确答案（填字母即可）。
 
 【混合模式规则】
 当用户说"出一道知识题"、"出知识类题"时，
@@ -202,28 +212,39 @@ export async function POST(req: NextRequest) {
   const { mode, competency, userMessage } = body
   if (!userMessage) return NextResponse.json({ error: '参数缺失' }, { status: 400 })
 
-  const systemPrompt = buildSystemPrompt(level as Level) + QUESTION_RULES
+  // 判断是否为报告/分析请求（这类请求用独立系统提示，绝对禁止出题）
+  const isReportOrAnalysis = /薄弱|报告|分析/.test(userMessage)
 
-  // ACC 固定知识类；random 模式 50/50 随机决定本题类型
-  let actualMode: Mode = level === 'ACC' ? 'knowledge' : (mode as Mode)
-  if (actualMode === 'random') {
-    actualMode = Math.random() < 0.5 ? 'knowledge' : 'sjt'
+  let finalUserMessage: string
+  let systemPrompt: string
+  let temperature: number
+
+  if (isReportOrAnalysis) {
+    systemPrompt = REPORT_SYSTEM
+    finalUserMessage = userMessage   // 不注入 modeHint，不附加题库参考
+    temperature = 0.3                // 低温度，减少"创意"出题的概率
+  } else {
+    systemPrompt = buildSystemPrompt(level as Level) + QUESTION_RULES
+
+    // ACC 固定知识类；random 模式 50/50 随机决定本题类型
+    let actualMode: Mode = level === 'ACC' ? 'knowledge' : (mode as Mode)
+    if (actualMode === 'random') {
+      actualMode = Math.random() < 0.5 ? 'knowledge' : 'sjt'
+    }
+
+    const resolvedCompetency = resolveDomain(competency)
+    let refQ: QuestionBankItem | null = null
+    if (actualMode === 'sjt') {
+      refQ = pickReferenceQuestion('sjt', resolvedCompetency) as QuestionBankItem | null
+    }
+
+    const modeHint = actualMode === 'knowledge'
+      ? '\n\n【本题类型】请出一道知识类单选题（题干+ABCD四选一，选出唯一正确答案）。'
+      : '\n\n【本题类型】请出一道情景题（按规定格式，包含最佳/最差操作）。'
+
+    finalUserMessage = userMessage + modeHint + buildReferenceBlock(refQ)
+    temperature = 0.8
   }
-
-  // 仅 sjt 模式使用情景题库参考；knowledge 模式让 AI 自编
-  const resolvedCompetency = resolveDomain(competency)
-  let refQ: QuestionBankItem | null = null
-  if (actualMode === 'sjt') {
-    refQ = pickReferenceQuestion('sjt', resolvedCompetency) as QuestionBankItem | null
-  }
-
-  const modeHint = actualMode === 'knowledge'
-    ? '\n\n【本题类型】请出一道知识类单选题（题干+ABCD四选一，选出唯一正确答案）。'
-    : '\n\n【本题类型】请出一道情景题（按规定格式，包含最佳/最差操作）。'
-
-  const referenceBlock = buildReferenceBlock(refQ)
-  const isOutQuestion = !userMessage.includes('薄弱') && !userMessage.includes('报告') && !userMessage.includes('分析')
-  const finalUserMessage = userMessage + (isOutQuestion ? modeHint : '') + referenceBlock
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -240,7 +261,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages,
-      temperature: 0.8,
+      temperature,
       max_tokens: 2000,
     }),
   })
