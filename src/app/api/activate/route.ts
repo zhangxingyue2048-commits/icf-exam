@@ -21,8 +21,8 @@ async function handleActivate(req: NextRequest) {
     return NextResponse.json({ error: '请填写激活码和真实姓名' }, { status: 400 })
   }
 
-  if (!/^ICF-[A-Z0-9]{6}$/.test(code)) {
-    return NextResponse.json({ error: '激活码格式不正确（格式：ICF-XXXXXX）' }, { status: 400 })
+  if (!/^ICF-[A-Z0-9-]{1,20}$/i.test(code)) {
+    return NextResponse.json({ error: '激活码格式不正确' }, { status: 400 })
   }
 
   const name = student_name.trim()
