@@ -426,21 +426,18 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
   const [loading, setLoading] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
   const [currentCompetency, setCurrentCompetency] = useState<string | null>(competency)
+  const [showHistory, setShowHistory] = useState(false)
 
   // Persistent session id
   const [sessionId, setSessionId] = useState<string>('')
   useEffect(() => {
     const existing = localStorage.getItem('practice_session_id')
-    if (existing) {
-      setSessionId(existing)
-    } else {
-      const id = `prac_${Date.now()}_${Math.random().toString(36).slice(2)}`
-      localStorage.setItem('practice_session_id', id)
-      setSessionId(id)
-    }
+    const id = existing || `prac_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    if (!existing) localStorage.setItem('practice_session_id', id)
+    setSessionId(id)
   }, [])
 
-  // Answer tracking (in-memory for this session)
+  // Answer tracking
   const [answerHistory, setAnswerHistory] = useState<LocalAnswer[]>([])
   const [scenarioHistory, setScenarioHistory] = useState<ScenarioInteraction[]>([])
 
@@ -455,6 +452,73 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
   }, [])
 
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
+
+  // ── 历史记录加载（sessionId就绪后执行） ──────────────────────
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    if (!sessionId || initializedRef.current) return
+    initializedRef.current = true
+
+    // 1. 尝试从 localStorage 恢复聊天记录
+    const savedChat = localStorage.getItem(`chat_history_${sessionId}`)
+    if (savedChat) {
+      try {
+        const savedMessages: Message[] = JSON.parse(savedChat)
+        if (savedMessages.length > 0) {
+          setMessages([
+            ...savedMessages,
+            {
+              id: uid(), role: 'assistant', type: 'assistant',
+              content: `📖 已恢复上次练习记录，共${savedMessages.length}条对话。说"下一题"继续练习。`,
+            },
+          ])
+          // 恢复对话历史（供 API 使用）
+          const apiHistory: APIMessage[] = savedMessages
+            .filter(m => m.role === 'user' || m.role === 'assistant')
+            .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+          setHistory(apiHistory)
+          historyRef.current = apiHistory
+          return // 有历史，不发初始题
+        }
+      } catch { /* 解析失败则正常初始化 */ }
+    }
+
+    // 2. 无历史记录，发出第一道题
+    const label = competency ? (COMPETENCY_LABELS[competency] ?? competency) : null
+    const initMsg = label ? `请出一道${label}相关的题目` : '请出第一道题'
+    sendMessage(initMsg)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
+
+  // 每次 messages 更新时保存到 localStorage（最近50条）
+  useEffect(() => {
+    if (sessionId && messages.length > 0) {
+      localStorage.setItem(`chat_history_${sessionId}`, JSON.stringify(messages.slice(-50)))
+    }
+  }, [messages, sessionId])
+
+  // 从 Supabase 恢复答题统计数据
+  useEffect(() => {
+    if (!sessionId) return
+    const loadStats = async () => {
+      const { data } = await supabase
+        .from('practice_records')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true })
+
+      if (data && data.length > 0) {
+        const restored: LocalAnswer[] = data.map(r => ({
+          competency: r.competency || '综合',
+          questionType: r.question_type as 'knowledge' | 'sjt',
+          userAnswer: r.user_answer || '',
+          isCorrect: r.is_correct,
+        }))
+        setAnswerHistory(restored)
+      }
+    }
+    loadStats()
+  }, [sessionId])
 
   // Auto-trigger: every 10 total answers
   useEffect(() => {
@@ -490,17 +554,6 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
       lastMsg.content.includes('针对薄弱点出题')
     ) setIsWaiting(false)
   }, [messages])
-
-  // First question on mount
-  const initializedRef = useRef(false)
-  useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-    const label = competency ? (COMPETENCY_LABELS[competency] ?? competency) : null
-    const initMsg = label ? `请出一道${label}相关的题目` : '请出第一道题'
-    sendMessage(initMsg)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
@@ -748,8 +801,79 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
   const levelBadge = LEVEL_COLORS[level]
   const competencyLabel = currentCompetency ? (COMPETENCY_LABELS[currentCompetency] ?? currentCompetency) : null
 
+  // 历史统计面板数据
+  const historyStats = (() => {
+    const kTotal = answerHistory.filter(a => a.questionType === 'knowledge').length
+    const sTotal = answerHistory.filter(a => a.questionType === 'sjt').length
+    const kCorrect = answerHistory.filter(a => a.questionType === 'knowledge' && a.isCorrect === true).length
+    const compMap: Record<string, number> = {}
+    for (const a of answerHistory) {
+      compMap[a.competency] = (compMap[a.competency] || 0) + 1
+    }
+    const compList = Object.entries(compMap).sort((a, b) => b[1] - a[1])
+    return { kTotal, sTotal, kCorrect, total: answerHistory.length, compList }
+  })()
+
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)]">
+    <div className="relative flex flex-col h-[calc(100vh-80px)]">
+      {/* History panel overlay */}
+      {showHistory && (
+        <div className="absolute inset-0 z-50 bg-black/30 flex items-start justify-center pt-16 px-4"
+          onClick={() => setShowHistory(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 space-y-4"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-[var(--foreground)]">本 Session 答题记录</h3>
+              <button onClick={() => setShowHistory(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--foreground)] text-lg leading-none">✕</button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-[var(--text-muted)]">累计练习</span>
+                <span className="font-medium">{historyStats.total} 题</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[var(--text-muted)]">知识类</span>
+                <span className="font-medium">{historyStats.kTotal} 题</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[var(--text-muted)]">情景类</span>
+                <span className="font-medium">{historyStats.sTotal} 题</span>
+              </div>
+              {historyStats.kTotal > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-[var(--text-muted)]">知识类正确率</span>
+                  <span className="font-medium text-green-600">
+                    {Math.round(historyStats.kCorrect / historyStats.kTotal * 100)}%
+                    （{historyStats.kCorrect}/{historyStats.kTotal}）
+                  </span>
+                </div>
+              )}
+            </div>
+            {historyStats.compList.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">能力项分布</p>
+                <div className="space-y-1">
+                  {historyStats.compList.map(([comp, count]) => (
+                    <div key={comp} className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--foreground)] w-20 shrink-0">{comp}</span>
+                      <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                        <div className="bg-[var(--primary)] h-1.5 rounded-full"
+                          style={{ width: `${Math.round(count / historyStats.total * 100)}%` }} />
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)] w-6 text-right">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {historyStats.total === 0 && (
+              <p className="text-sm text-[var(--text-muted)] text-center py-2">暂无答题记录</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="flex items-center justify-between py-3 border-b border-[var(--border)] bg-[var(--surface)] flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -758,9 +882,7 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
             <span className="text-xs text-[var(--foreground)] font-medium">{studentName}</span>
           )}
           {(() => {
-            const kTotal = answerHistory.filter(a => a.questionType === 'knowledge').length
-            const kCorrect = answerHistory.filter(a => a.questionType === 'knowledge' && a.isCorrect === true).length
-            const total = answerHistory.length
+            const { kTotal, kCorrect, total } = historyStats
             return (
               <>
                 <span className="text-xs text-[var(--text-muted)]">已练{total}题</span>
@@ -774,6 +896,12 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
           })()}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowHistory(true)}
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors px-2 py-1 rounded"
+          >
+            历史记录
+          </button>
           <button
             onClick={onReset}
             className="text-xs text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors px-2 py-1 rounded"
