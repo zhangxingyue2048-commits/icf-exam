@@ -623,7 +623,17 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
 
     // ── 正常出题/对话路径 ────────────────────────────────────
     const intent = detectIntent(userText)
+    // 是否明确要求出新题（含各种表达方式）
+    const isNextQuestion = /下一题|继续|再出一道|出题|新题|出.{0,10}题/.test(userText)
+    // 是否为追问（曾经收到过解析，且当前不是出题请求也不是特殊意图）
+    const hasHadExplanation = messages.some(m => m.role === 'assistant' && m.type === 'explanation')
+    const isFollowUpDialog = !intent && !isNextQuestion && hasHadExplanation
+
     let apiMessage = userText
+
+    if (isFollowUpDialog) {
+      apiMessage = `学员对刚才的解析有疑问，请直接回答以下问题，不要出新题：${userText}`
+    }
 
     if (intent === 'weak' || intent === 'target-weak') {
       const { data: dbRecords } = await supabase

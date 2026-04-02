@@ -168,6 +168,12 @@ export async function POST(req: NextRequest) {
 - 出题时只出题，解析时只给解析，绝对不能混在一起
 - 出完题后禁止附加任何上一题的结束语
 
+【对话回答规则】
+如果用户消息以"学员对刚才的解析有疑问，请直接回答"开头：
+· 只回答学员的问题，针对刚才的解析进行深入解释
+· 回答结束后说"如有其他疑问请继续提问，或说'下一题'继续练习"
+· 绝对不出新题
+
 【出题结尾格式（必须严格遵守）】
 - 情景题结尾：请分别选出最佳和最差操作（填字母即可），提交后我将为你提供详细解析。
 - 知识类题结尾：请选出正确答案（填字母即可）。
@@ -212,18 +218,26 @@ export async function POST(req: NextRequest) {
   const { mode, competency, userMessage } = body
   if (!userMessage) return NextResponse.json({ error: '参数缺失' }, { status: 400 })
 
-  // 判断是否为报告/分析请求（这类请求用独立系统提示，绝对禁止出题）
+  // 判断请求类型
   const isReportOrAnalysis = /薄弱|报告|分析/.test(userMessage)
+  const isFollowUpDialog = userMessage.startsWith('学员对刚才的解析有疑问')
 
   let finalUserMessage: string
   let systemPrompt: string
   let temperature: number
 
   if (isReportOrAnalysis) {
+    // 报告/分析：独立系统提示，绝对禁止出题
     systemPrompt = REPORT_SYSTEM
-    finalUserMessage = userMessage   // 不注入 modeHint，不附加题库参考
-    temperature = 0.3                // 低温度，减少"创意"出题的概率
+    finalUserMessage = userMessage
+    temperature = 0.3
+  } else if (isFollowUpDialog) {
+    // 追问：回答问题，不出题，不注入 modeHint
+    systemPrompt = buildSystemPrompt(level as Level) + QUESTION_RULES
+    finalUserMessage = userMessage
+    temperature = 0.6
   } else {
+    // 正常出题路径
     systemPrompt = buildSystemPrompt(level as Level) + QUESTION_RULES
 
     // ACC 固定知识类；random 模式 50/50 随机决定本题类型
