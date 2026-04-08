@@ -196,9 +196,9 @@ ${weakItems.length === 0 ? '本轮练习表现优秀，继续保持！' : `需�
 
 function buildConsistencyPrompt(scenarios: ScenarioInteraction[]): string {
   const pairs = scenarios.map((s, i) =>
-    `【第${i + 1}题 · ${s.competency}】\n题目：${s.question.slice(0, 200)}...\n学员排序：${s.userAnswer}\n参考分析要点：${s.explanation.slice(0, 300)}...`
+    `【第${i + 1}题 · ${s.competency}】\n题目：${s.question.slice(0, 200)}...\n学员排序：${s.userAnswer}\n解析要点：${s.explanation.slice(0, 300)}...`
   ).join('\n\n')
-  return `请对学员最近${scenarios.length}道情景题的作答进行一致性分析：\n\n${pairs}\n\n分析要求：\n1. 找出学员在相似场景（如教练情绪管理、边界处理等）的判断是否前后一致\n2. 如有矛盾，用"我注意到"而非"你前后矛盾"的语气指出\n3. 给出一条具体的提升建议\n4. 分析控制在150字内，分析结束后不出任何新题，最后一句只写：说"下一题"继续练习。`
+  return `请对学员最近${scenarios.length}道情景题的作答进行一致性分析：\n\n${pairs}\n\n【分析要求——严格遵守】\n1. 首先判断学员在这${scenarios.length}题中是否有答错记录（对照解析中的最佳/最差选项与学员实际排序）\n2. 如果学员所有题目的最佳和最差都选对了：只写"整体一致性高，判断框架稳定！"，不给任何改进建议，禁止提及"次佳"或"可以进一步练习"\n3. 只有当学员有明确答错记录时，才分析不一致之处并给出建议\n4. 如有矛盾，用"我注意到"而非"你前后矛盾"的语气指出\n5. 分析控制在150字内，分析结束后不出任何新题，最后一句只写：说"下一题"继续练习。`
 }
 
 // ─── Selection Screen ─────────────────────────────────────────────────────────

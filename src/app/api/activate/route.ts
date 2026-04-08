@@ -45,8 +45,9 @@ async function handleActivate(req: NextRequest) {
 
   // 已激活过
   if (activation.is_used) {
-    // 不同设备 → 拒绝
-    if (activation.browser_fingerprint !== fingerprint) {
+    // 指纹已存且不匹配 → 不同设备拒绝
+    // 注意：browser_fingerprint 为 null/空时（旧数据）不触发设备冲突，允许通过
+    if (activation.browser_fingerprint && activation.browser_fingerprint !== fingerprint) {
       return NextResponse.json({ error: DEVICE_CONFLICT_MSG }, { status: 403 })
     }
     // 同设备回来 → 直接返回已有 session

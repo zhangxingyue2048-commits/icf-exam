@@ -187,12 +187,30 @@ export async function POST(req: NextRequest) {
     const { userAnswer } = body
     if (!userAnswer) return NextResponse.json({ error: '参数缺失' }, { status: 400 })
 
+    // 从对话历史最后一条助手消息里提取最佳/最差选项（用于准确反馈）
+    const lastQuestion = [...conversationHistory].reverse().find(
+      (m: { role: string; content: string }) => m.role === 'assistant' &&
+        m.content.includes('最佳操作') && m.content.includes('最差操作')
+    )
+    const bestMatch = lastQuestion?.content.match(/最佳操作[：:]\s*\n?([A-D])/i)
+    const worstMatch = lastQuestion?.content.match(/最差操作[：:]\s*\n?([A-D])/i)
+    const refBest = bestMatch?.[1]?.toUpperCase() ?? null
+    const refWorst = worstMatch?.[1]?.toUpperCase() ?? null
+
     const ANALYSIS_SYSTEM = buildSystemPrompt(level as Level) + `
 【当前任务：给出解析】
 学员刚提交了上一道题的答案。你必须且只能做一件事：
 1. 给出完整解析（情景题给四层排序分析，知识题给正确答案解释）
 2. 解析结尾只写：解析完毕！说"下一题"继续。
-3. 绝对不出任何新题`
+3. 绝对不出任何新题
+
+【解析反馈规则——严格遵守】
+学员提交的答案是：${userAnswer}
+${refBest && refWorst ? `本题参考答案：最佳${refBest}，最差${refWorst}` : '（请从题目内容中确认最佳和最差选项）'}
+- 先对比学员答案与参考答案，做出客观判断
+- 如果完全一致（最佳和最差都对）：可以表扬学员判断正确
+- 如果任何一项不一致：必须如实指出哪里不同，禁止说"判断完全正确"、"分析非常准确"或任何正面肯定
+- 不一致时：先说明哪里不同，再给出正确的分析逻辑`
 
     const analysisUserMsg = `学员答案：${userAnswer}。请给出完整解析。`
 
@@ -256,7 +274,24 @@ export async function POST(req: NextRequest) {
       ? '\n\n【本题类型】请出一道知识类单选题（题干+ABCD四选一，选出唯一正确答案）。'
       : '\n\n【本题类型】请出一道情景题（按规定格式，包含最佳/最差操作）。'
 
-    finalUserMessage = userMessage + modeHint + buildReferenceBlock(refQ)
+    // 提取最近出过的题目关键词，避免重复
+    const recentTopics: string[] = []
+    const assistantMessages = conversationHistory
+      .filter((m: { role: string; content: string }) => m.role === 'assistant')
+      .slice(-10) // 取最近10条助手消息
+    for (const m of assistantMessages) {
+      // 提取题干的前30个字符作为标识
+      const lines = (m.content as string).split('\n').filter((l: string) => l.trim().length > 10)
+      if (lines.length > 0) {
+        const snippet = lines[0].replace(/[【】\[\]#*]/g, '').trim().slice(0, 30)
+        if (snippet) recentTopics.push(snippet)
+      }
+    }
+    const dedupeHint = recentTopics.length > 0
+      ? `\n\n【去重要求】以下是最近已出过的题目开头片段，请务必出一道与这些内容完全不同的新题：\n${recentTopics.map(t => `· ${t}`).join('\n')}`
+      : ''
+
+    finalUserMessage = userMessage + modeHint + dedupeHint + buildReferenceBlock(refQ)
     temperature = 0.8
   }
 
