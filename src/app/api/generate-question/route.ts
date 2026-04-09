@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
 每道情景题解析的最后一行固定输出（知识题不需要）：
 📌 本解析依据 ICF 官方文件及多年笔试辅导经验整理，非 ICF 官方标准答案，请结合自身理解参考学习。`
 
-    const analysisUserMsg = `答案提交：${userAnswer}。请给出完整解析。`
+    const analysisUserMsg = `学员选择了${refBest && refWorst ? `最佳${userAnswer.match(/最佳\s*([A-D])/i)?.[1] ?? userAnswer}，最差${userAnswer.match(/最差\s*([A-D])/i)?.[1] ?? ''}` : userAnswer}，请直接给出解析，不要重复显示学员答案和参考答案对比。`
 
     const messages = [
       { role: 'system', content: ANALYSIS_SYSTEM },
