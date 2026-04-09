@@ -15,7 +15,7 @@ const LEVELS: { id: ExamLevel; name: string; desc: string; details: string[] }[]
     id: 'ACC',
     name: 'ACC',
     desc: '助理认证教练',
-    details: ['知识类单选题', '道德准则 · 能力定义 · 边界判断', '500小时教练经验要求'],
+    details: ['知识类单选题', '道德准则 · 能力定义 · 边界判断', '100小时教练经验要求'],
   },
   {
     id: 'PCC',

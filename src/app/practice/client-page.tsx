@@ -208,15 +208,27 @@ interface SelectionScreenProps {
   onStart: (level: Level, mode: Mode, competency: string | null) => void
 }
 
+const CC_GROUPED_DOMAINS = [
+  { label: 'Foundation 基础', ccs: ['CC1', 'CC2'] },
+  { label: 'Co-Creating the Relationship 共创关系', ccs: ['CC3', 'CC4', 'CC5'] },
+  { label: 'Communicating Effectively 高效沟通', ccs: ['CC6', 'CC7'] },
+  { label: 'Cultivating Learning and Growth 促进学习和成长', ccs: ['CC8'] },
+]
+
 function SelectionScreen({ level, onStart }: SelectionScreenProps) {
   const [mode, setMode] = useState<Mode | null>(null)
-  const [competency, setCompetency] = useState<string | null>(null)
+  const [selectedCCs, setSelectedCCs] = useState<string[]>([])
 
   const effectiveMode: Mode | null = level === 'ACC' ? 'knowledge' : mode
   const canStart = effectiveMode !== null
 
-  function toggleCompetency(code: string) {
-    setCompetency(prev => prev === code ? null : code)
+  function toggleCC(id: string) {
+    setSelectedCCs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  // ACC domains are single-select
+  function toggleACCDomain(code: string) {
+    setSelectedCCs(prev => prev.includes(code) ? [] : [code])
   }
 
   return (
@@ -276,15 +288,15 @@ function SelectionScreen({ level, onStart }: SelectionScreenProps) {
               {ACC_DOMAINS.map((d) => (
                 <button
                   key={d.code}
-                  onClick={() => toggleCompetency(d.code)}
+                  onClick={() => toggleACCDomain(d.code)}
                   className={`flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                    competency === d.code
+                    selectedCCs.includes(d.code)
                       ? 'border-[var(--primary)] bg-[#e8f0f8]'
                       : 'border-[var(--border)] hover:border-[var(--primary-light)]'
                   }`}
                 >
                   <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                    competency === d.code ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-gray-300'
+                    selectedCCs.includes(d.code) ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-gray-300'
                   }`} />
                   <div>
                     <span className="font-medium text-sm text-[var(--foreground)]">{d.label}</span>
@@ -298,56 +310,36 @@ function SelectionScreen({ level, onStart }: SelectionScreenProps) {
 
         {(level === 'PCC' || level === 'MCC') && (
           <div className="space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)] mb-1">
-                考试领域 <span className="font-normal text-[var(--text-muted)]">（可选）</span>
-              </p>
-              <div className="flex flex-col gap-2 mt-2">
-                {PCC_DOMAINS.map((d) => (
-                  <button
-                    key={d.code}
-                    onClick={() => toggleCompetency(d.code)}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 text-left transition-all ${
-                      competency === d.code
-                        ? 'border-[var(--primary)] bg-[#e8f0f8]'
-                        : 'border-[var(--border)] hover:border-[var(--primary-light)]'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                      competency === d.code ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-gray-300'
-                    }`} />
-                    <div className="flex-1">
-                      <span className="font-medium text-sm text-[var(--foreground)]">{d.label}</span>
-                    </div>
-                  </button>
-                ))}
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              专项练习 <span className="font-normal text-[var(--text-muted)]">（可多选，不选则随机混合）</span>
+            </p>
+            {CC_GROUPED_DOMAINS.map((domain) => (
+              <div key={domain.label}>
+                <p className="text-xs text-[var(--text-muted)] font-medium mb-2">{domain.label}</p>
+                <div className="flex flex-wrap gap-2">
+                  {domain.ccs.map((ccId) => {
+                    const cc = COMPETENCIES.find(c => c.id === ccId)!
+                    const isSelected = selectedCCs.includes(ccId)
+                    return (
+                      <button
+                        key={ccId}
+                        onClick={() => toggleCC(ccId)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                          isSelected
+                            ? 'border-[var(--primary)] bg-[#e8f0f8] text-[var(--primary)] font-semibold'
+                            : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary-light)]'
+                        }`}
+                      >
+                        {cc.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)] mb-1">
-                能力项细选 <span className="font-normal text-[var(--text-muted)]">（可选，与领域独立使用）</span>
-              </p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {COMPETENCIES.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => toggleCompetency(c.id)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                      competency === c.id
-                        ? 'border-[var(--primary)] bg-[#e8f0f8] text-[var(--primary)] font-semibold'
-                        : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary-light)]'
-                    }`}
-                  >
-                    {c.id}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {competency && (
+            ))}
+            {selectedCCs.length > 0 && (
               <p className="text-xs text-[var(--primary)]">
-                已选：{COMPETENCY_LABELS[competency] ?? competency}
+                已选：{selectedCCs.map(id => COMPETENCIES.find(c => c.id === id)?.label ?? id).join('、')}
               </p>
             )}
           </div>
@@ -367,7 +359,7 @@ function SelectionScreen({ level, onStart }: SelectionScreenProps) {
         </div>
 
         <button
-          onClick={() => level && effectiveMode && onStart(level, effectiveMode, competency)}
+          onClick={() => level && effectiveMode && onStart(level, effectiveMode, selectedCCs.length > 0 ? selectedCCs.join(',') : null)}
           disabled={!canStart}
           className="btn-primary w-full"
         >
@@ -425,7 +417,14 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [questionCount, setQuestionCount] = useState(0)
-  const [currentCompetency, setCurrentCompetency] = useState<string | null>(competency)
+  // Parse multi-select competency pool from comma-joined initial prop
+  const [competencyPool] = useState<string[]>(() =>
+    competency ? competency.split(',').filter(Boolean) : []
+  )
+  // currentCompetency tracks the CC of the question currently in focus (updated from conversation)
+  const [currentCompetency, setCurrentCompetency] = useState<string | null>(
+    competency && !competency.includes(',') ? competency : null
+  )
   const [showHistory, setShowHistory] = useState(false)
 
   // Persistent session id
@@ -484,8 +483,12 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
     }
 
     // 2. 无历史记录，发出第一道题
-    const label = competency ? (COMPETENCY_LABELS[competency] ?? competency) : null
-    const initMsg = label ? `请出一道${label}相关的题目` : '请出第一道题'
+    let initMsg = '请出第一道题'
+    if (competencyPool.length > 0) {
+      const pick = competencyPool[Math.floor(Math.random() * competencyPool.length)]
+      const label = COMPETENCY_LABELS[pick] ?? pick
+      initMsg = `请出一道${label}相关的题目`
+    }
     sendMessage(initMsg)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
@@ -683,7 +686,9 @@ function ChatScreen({ level, mode, competency, studentName, onReset, onLogout }:
           isSubmittingAnswer: false,
           level,
           mode: /知识题|知识类题|单选题/.test(userText) ? 'knowledge' : mode,
-          competency: currentCompetency,
+          competency: currentCompetency ?? (competencyPool.length > 0
+            ? competencyPool[Math.floor(Math.random() * competencyPool.length)]
+            : null),
           userMessage: apiMessage,
           conversationHistory: curHistory,
         }),
