@@ -287,7 +287,8 @@ function SelectionScreen({
     <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '40px', paddingBottom: '40px', paddingLeft: '16px', paddingRight: '16px' }}>
       <div style={{ width: '100%', maxWidth: '480px' }}>
 
-        <div style={{ marginBottom: '32px' }}>
+        {/* 1. 级别徽章 */}
+        <div style={{ marginBottom: '20px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, padding: '4px 12px', borderRadius: '20px', background: '#1a2f4a', color: '#a8c4e0', letterSpacing: '0.5px' }}>
             备考级别 · {level}
           </span>
@@ -296,74 +297,93 @@ function SelectionScreen({
           )}
         </div>
 
-        {level === 'ACC' ? (
-          <div style={{ padding: '12px 16px', borderRadius: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '14px', color: '#1d4ed8', marginBottom: '32px' }}>
-            ACC 级别仅含知识类单选题，无需选择模式
+        {/* 2. 使用说明卡片 */}
+        <div style={{ marginBottom: '28px', padding: '16px 18px', borderRadius: '12px', background: '#f8fafc', border: '0.5px solid #e5e7eb' }}>
+          <p style={{ fontSize: '13px', fontWeight: 500, color: '#1a3060', marginBottom: '10px' }}>你可以这样使用：</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {[
+              ['按级别练习', 'ACC 知识类 / PCC·MCC 情景题'],
+              ['指定板块练习', '选择对应的考试板块或能力项'],
+              ['对话指定出题', '直接说「给我出 CC7 的题」或「出一道伦理题」'],
+              ['分析薄弱点', '说「分析我的薄弱点」'],
+              ['生成学习报告', '说「给我学习报告」（每 10 题自动触发）'],
+              ['补考专项练习', '选择上次考试未达标的板块定向练习'],
+            ].map(([label, desc]) => (
+              <div key={label} style={{ display: 'flex', gap: '6px', fontSize: '13px', lineHeight: '1.6' }}>
+                <span style={{ color: '#9ca3af', flexShrink: 0 }}>·</span>
+                <span>
+                  <span style={{ color: '#374151', fontWeight: 500 }}>{label}：</span>
+                  <span style={{ color: '#6b7280' }}>{desc}</span>
+                </span>
+              </div>
+            ))}
           </div>
-        ) : (
-          <>
-            <p style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '1.2px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>练习模式</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}>
-              {MODES.map(m => (
-                <button
-                  key={m.value}
-                  onClick={() => setMode(m.value)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '8px', border: mode === m.value ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', background: mode === m.value ? '#f0f5fc' : '#ffffff', cursor: 'pointer', textAlign: 'left', width: '100%', fontFamily: 'inherit' }}
-                >
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: mode === m.value ? '1.5px solid #2a5298' : '1.5px solid #d1d5db', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {mode === m.value && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2a5298' }} />}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{m.label}</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>{m.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        </div>
 
-        {(level === 'PCC' || level === 'MCC') && (
-          <>
-            <div style={{ height: '0.5px', background: '#f3f4f6', marginBottom: '32px' }} />
-            <p style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '1.2px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '6px' }}>专项练习</p>
-            <p style={{ fontSize: '12px', color: '#d1d5db', marginBottom: '14px' }}>可多选，不选则随机混合出题</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '32px' }}>
-              {DOMAINS.map(domain => {
-                const anyChecked = domain.ccs.some(c => checkedCCs.has(c.code))
-                return (
-                  <div
-                    key={domain.key}
-                    onClick={() => toggleDomain(domain.ccs)}
-                    style={{ border: anyChecked ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', borderRadius: '12px', padding: '14px 16px', background: '#ffffff', cursor: 'pointer' }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{domain.name}</div>
-                    <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px' }}>{domain.en}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {domain.ccs.map(cc => {
-                        const isChecked = checkedCCs.has(cc.code)
-                        return (
-                          <div
-                            key={cc.code}
-                            onClick={e => toggleCC(cc.code, e as React.MouseEvent)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', color: isChecked ? '#1a3a6b' : '#6b7280', background: isChecked ? '#eef3fb' : 'transparent', border: isChecked ? '0.5px solid #b8d0f0' : '0.5px solid transparent', cursor: 'pointer', userSelect: 'none' }}
-                          >
-                            <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: isChecked ? '1px solid #2a5298' : '1px solid #d1d5db', background: isChecked ? '#2a5298' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#fff' }}>
-                              {isChecked ? '✓' : ''}
-                            </div>
-                            <span style={{ fontSize: '10px', fontWeight: 500, color: isChecked ? '#2a5298' : '#9ca3af', minWidth: '26px' }}>{cc.code}</span>
-                            <span>{cc.name}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
+        {/* 3. 练习模式 */}
+        <p style={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>练习模式</p>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}>
+          {MODES.map(m => (
+            <button
+              key={m.value}
+              onClick={() => setMode(m.value)}
+              style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '8px', border: mode === m.value ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', background: mode === m.value ? '#f0f5fc' : '#ffffff', cursor: 'pointer', textAlign: 'left', width: '100%', fontFamily: 'inherit' }}
+            >
+              <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: mode === m.value ? '1.5px solid #2a5298' : '1.5px solid #d1d5db', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {mode === m.value && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2a5298' }} />}
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{m.label}</div>
+                <div style={{ fontSize: '12px', color: '#9ca3af' }}>{m.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* 4. 分割线 */}
+        <div style={{ height: '0.5px', background: '#f3f4f6', marginBottom: '32px' }} />
+
+        {/* 5. 专项练习 */}
+        <p style={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '6px' }}>专项练习</p>
+        <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '14px' }}>可多选，不选则随机混合出题</p>
+
+        {/* 6. 四大领域网格 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '32px' }}>
+          {DOMAINS.map(domain => {
+            const anyChecked = domain.ccs.some(c => checkedCCs.has(c.code))
+            return (
+              <div
+                key={domain.key}
+                onClick={() => toggleDomain(domain.ccs)}
+                style={{ border: anyChecked ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', borderRadius: '12px', padding: '14px 16px', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{domain.name}</div>
+                <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px' }}>{domain.en}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {domain.ccs.map(cc => {
+                    const isChecked = checkedCCs.has(cc.code)
+                    return (
+                      <div
+                        key={cc.code}
+                        onClick={e => toggleCC(cc.code, e)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', color: isChecked ? '#1a3a6b' : '#6b7280', background: isChecked ? '#eef3fb' : 'transparent', border: isChecked ? '0.5px solid #b8d0f0' : '0.5px solid transparent', cursor: 'pointer', userSelect: 'none' }}
+                      >
+                        <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: isChecked ? '1px solid #2a5298' : '1px solid #d1d5db', background: isChecked ? '#2a5298' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#fff' }}>
+                          {isChecked ? '✓' : ''}
+                        </div>
+                        <span style={{ fontSize: '10px', fontWeight: 500, color: isChecked ? '#2a5298' : '#9ca3af', minWidth: '26px' }}>{cc.code}</span>
+                        <span>{cc.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* 7. 开始按钮 */}
         <button
           onClick={() => onStart(mode, Array.from(checkedCCs))}
           style={{ width: '100%', padding: '13px', borderRadius: '8px', border: 'none', background: '#1a3060', color: '#e8f0fc', fontSize: '15px', fontWeight: 500, cursor: 'pointer', letterSpacing: '0.3px', fontFamily: 'inherit' }}
