@@ -209,10 +209,10 @@ interface SelectionScreenProps {
 }
 
 const CC_GROUPED_DOMAINS = [
-  { label: 'Foundation 基础', ccs: ['CC1', 'CC2'] },
-  { label: 'Co-Creating the Relationship 共创关系', ccs: ['CC3', 'CC4', 'CC5'] },
-  { label: 'Communicating Effectively 高效沟通', ccs: ['CC6', 'CC7'] },
-  { label: 'Cultivating Learning and Growth 促进学习和成长', ccs: ['CC8'] },
+  { label: 'Foundation 基础', ccs: ['CC1', 'CC2'], color: '#3B82F6' },
+  { label: 'Co-Creating the Relationship 共创关系', ccs: ['CC3', 'CC4', 'CC5'], color: '#8B5CF6' },
+  { label: 'Communicating Effectively 高效沟通', ccs: ['CC6', 'CC7'], color: '#10B981' },
+  { label: 'Cultivating Learning and Growth 促进学习和成长', ccs: ['CC8'], color: '#F59E0B' },
 ]
 
 function SelectionScreen({ level, onStart }: SelectionScreenProps) {
@@ -309,38 +309,51 @@ function SelectionScreen({ level, onStart }: SelectionScreenProps) {
         )}
 
         {(level === 'PCC' || level === 'MCC') && (
-          <div className="space-y-4">
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              专项练习 <span className="font-normal text-[var(--text-muted)]">（可多选，不选则随机混合）</span>
-            </p>
-            {CC_GROUPED_DOMAINS.map((domain) => (
-              <div key={domain.label}>
-                <p className="text-xs text-[var(--text-muted)] font-medium mb-2">{domain.label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {domain.ccs.map((ccId) => {
-                    const cc = COMPETENCIES.find(c => c.id === ccId)!
-                    const isSelected = selectedCCs.includes(ccId)
-                    return (
-                      <button
-                        key={ccId}
-                        onClick={() => toggleCC(ccId)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
-                          isSelected
-                            ? 'border-[var(--primary)] bg-[#e8f0f8] text-[var(--primary)] font-semibold'
-                            : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--primary-light)]'
-                        }`}
-                      >
-                        {cc.label}
-                      </button>
-                    )
-                  })}
+          <div>
+            <p className="text-sm font-semibold text-[var(--foreground)] mb-3">专项练习</p>
+            <div className="flex flex-col gap-3">
+              {CC_GROUPED_DOMAINS.map((domain) => (
+                <div
+                  key={domain.label}
+                  className="flex rounded-xl overflow-hidden bg-white shadow-sm border border-gray-100"
+                >
+                  {/* colored left bar */}
+                  <div className="w-1 flex-shrink-0 rounded-l-xl" style={{ backgroundColor: domain.color }} />
+                  <div className="flex-1 px-4 py-3">
+                    <p className="text-sm font-semibold mb-2" style={{ color: domain.color }}>
+                      {domain.label}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {domain.ccs.map((ccId) => {
+                        const cc = COMPETENCIES.find(c => c.id === ccId)!
+                        const isSelected = selectedCCs.includes(ccId)
+                        return (
+                          <button
+                            key={ccId}
+                            onClick={() => toggleCC(ccId)}
+                            className="text-xs px-3 py-1.5 rounded-full border transition-all"
+                            style={isSelected ? {
+                              borderColor: domain.color,
+                              backgroundColor: `${domain.color}18`,
+                              color: domain.color,
+                              fontWeight: 600,
+                            } : {}}
+                          >
+                            {isSelected ? cc.label : <span className="text-[var(--text-muted)]">{cc.label}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {selectedCCs.length > 0 && (
-              <p className="text-xs text-[var(--primary)]">
+              ))}
+            </div>
+            {selectedCCs.length > 0 ? (
+              <p className="text-xs mt-2" style={{ color: CC_GROUPED_DOMAINS.find(d => d.ccs.includes(selectedCCs[0]))?.color ?? 'var(--primary)' }}>
                 已选：{selectedCCs.map(id => COMPETENCIES.find(c => c.id === id)?.label ?? id).join('、')}
               </p>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)] mt-2">可多选，不选则随机混合出题</p>
             )}
           </div>
         )}
