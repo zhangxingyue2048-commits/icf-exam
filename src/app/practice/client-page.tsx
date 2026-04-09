@@ -43,11 +43,11 @@ interface ScenarioInteraction {
 
 const COMPETENCIES = [
   { id: 'CC1', label: 'CC1 展现道德实践' },
-  { id: 'CC2', label: 'CC2 体现教练思维' },
-  { id: 'CC3', label: 'CC3 建立并维护协议' },
+  { id: 'CC2', label: 'CC2 展现教练思维' },
+  { id: 'CC3', label: 'CC3 建立并维持合约' },
   { id: 'CC4', label: 'CC4 培养信任与安全感' },
   { id: 'CC5', label: 'CC5 保持临在' },
-  { id: 'CC6', label: 'CC6 积极倾听' },
+  { id: 'CC6', label: 'CC6 积极聆听' },
   { id: 'CC7', label: 'CC7 唤起觉察' },
   { id: 'CC8', label: 'CC8 促进客户成长' },
 ]
