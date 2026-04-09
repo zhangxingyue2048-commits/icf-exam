@@ -287,6 +287,11 @@ function SelectionScreen({
     <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '40px', paddingBottom: '40px', paddingLeft: '16px', paddingRight: '16px' }}>
       <div style={{ width: '100%', maxWidth: '480px' }}>
 
+        {/* 0. 标题 */}
+        <div style={{ marginBottom: '8px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#1a3060', letterSpacing: '-0.5px', margin: 0 }}>ICF 笔试练习平台</h1>
+        </div>
+
         {/* 1. 级别徽章 */}
         <div style={{ marginBottom: '20px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, padding: '4px 12px', borderRadius: '20px', background: '#1a2f4a', color: '#a8c4e0', letterSpacing: '0.5px' }}>
