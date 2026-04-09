@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -203,181 +203,176 @@ function buildConsistencyPrompt(scenarios: ScenarioInteraction[]): string {
 
 // ─── Selection Screen ─────────────────────────────────────────────────────────
 
-interface SelectionScreenProps {
-  level: Level
-  onStart: (level: Level, mode: Mode, competency: string | null) => void
-}
-
-const CC_GROUPED_DOMAINS = [
-  { label: 'Foundation 基础', ccs: ['CC1', 'CC2'], color: '#3B82F6' },
-  { label: 'Co-Creating the Relationship 共创关系', ccs: ['CC3', 'CC4', 'CC5'], color: '#8B5CF6' },
-  { label: 'Communicating Effectively 高效沟通', ccs: ['CC6', 'CC7'], color: '#10B981' },
-  { label: 'Cultivating Learning and Growth 促进学习和成长', ccs: ['CC8'], color: '#F59E0B' },
+const DOMAINS = [
+  {
+    key: 'foundation',
+    name: '基础',
+    en: 'Foundation',
+    ccs: [
+      { code: 'CC1', name: '展现道德实践' },
+      { code: 'CC2', name: '展现教练思维' },
+    ],
+  },
+  {
+    key: 'cocreating',
+    name: '共创关系',
+    en: 'Co-Creating',
+    ccs: [
+      { code: 'CC3', name: '建立并维持合约' },
+      { code: 'CC4', name: '培养信任与安全感' },
+      { code: 'CC5', name: '保持临在' },
+    ],
+  },
+  {
+    key: 'communicating',
+    name: '高效沟通',
+    en: 'Communicating',
+    ccs: [
+      { code: 'CC6', name: '积极聆听' },
+      { code: 'CC7', name: '唤起觉察' },
+    ],
+  },
+  {
+    key: 'cultivating',
+    name: '促进成长',
+    en: 'Cultivating',
+    ccs: [
+      { code: 'CC8', name: '促进客户成长' },
+    ],
+  },
 ]
 
-function SelectionScreen({ level, onStart }: SelectionScreenProps) {
-  const [mode, setMode] = useState<Mode | null>(null)
-  const [selectedCCs, setSelectedCCs] = useState<string[]>([])
+const MODES = [
+  { value: 'random', label: '随机混合', desc: '知识类与情景题交替出题' },
+  { value: 'knowledge', label: '知识类单选', desc: '概念、定义、边界判断' },
+  { value: 'sjt', label: '情景题', desc: '四选项排序，考察实战判断' },
+]
 
-  const effectiveMode: Mode | null = level === 'ACC' ? 'knowledge' : mode
-  const canStart = effectiveMode !== null
+function SelectionScreen({
+  level,
+  studentName,
+  onStart,
+}: {
+  level: string
+  studentName: string
+  onStart: (mode: string, selectedCCs: string[]) => void
+}) {
+  const [mode, setMode] = React.useState('random')
+  const [checkedCCs, setCheckedCCs] = React.useState<Set<string>>(new Set())
 
-  function toggleCC(id: string) {
-    setSelectedCCs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleCC = (code: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCheckedCCs(prev => {
+      const next = new Set(prev)
+      next.has(code) ? next.delete(code) : next.add(code)
+      return next
+    })
   }
 
-  // ACC domains are single-select
-  function toggleACCDomain(code: string) {
-    setSelectedCCs(prev => prev.includes(code) ? [] : [code])
+  const toggleDomain = (ccs: { code: string }[]) => {
+    const codes = ccs.map(c => c.code)
+    const allChecked = codes.every(c => checkedCCs.has(c))
+    setCheckedCCs(prev => {
+      const next = new Set(prev)
+      if (allChecked) {
+        codes.forEach(c => next.delete(c))
+      } else {
+        codes.forEach(c => next.add(c))
+      }
+      return next
+    })
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] py-8">
-      <div className="card w-full max-w-lg space-y-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-[var(--foreground)]">ICF笔试练习</h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">选择备考级别和练习模式开始</p>
+    <div style={{ minHeight: '100vh', background: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '40px', paddingBottom: '40px', paddingLeft: '16px', paddingRight: '16px' }}>
+      <div style={{ width: '100%', maxWidth: '480px' }}>
+
+        <div style={{ marginBottom: '32px' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, padding: '4px 12px', borderRadius: '20px', background: '#1a2f4a', color: '#a8c4e0', letterSpacing: '0.5px' }}>
+            备考级别 · {level}
+          </span>
+          {studentName && (
+            <span style={{ marginLeft: '12px', fontSize: '14px', color: '#9ca3af' }}>{studentName}</span>
+          )}
         </div>
 
-        {/* Level display */}
-        <p className="text-xs text-[var(--text-muted)]">当前备考级别：{level}</p>
-
-        {/* Mode */}
         {level === 'ACC' ? (
-          <div className="px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-700">
+          <div style={{ padding: '12px 16px', borderRadius: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '14px', color: '#1d4ed8', marginBottom: '32px' }}>
             ACC 级别仅含知识类单选题，无需选择模式
           </div>
-        ) : level ? (
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)] mb-3">练习模式</p>
-            <div className="flex flex-col gap-2">
-              {[
-                { id: 'random', label: '随机混合', desc: '知识类与情景题交替出题' },
-                { id: 'knowledge', label: '知识类单选', desc: '概念、定义、边界判断' },
-                { id: 'sjt', label: '情景题', desc: '四选项排序，考察实战判断' },
-              ].map((m) => (
+        ) : (
+          <>
+            <p style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '1.2px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>练习模式</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}>
+              {MODES.map(m => (
                 <button
-                  key={m.id}
-                  onClick={() => setMode(m.id as Mode)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                    mode === m.id
-                      ? 'border-[var(--primary)] bg-[#e8f0f8]'
-                      : 'border-[var(--border)] hover:border-[var(--primary-light)]'
-                  }`}
+                  key={m.value}
+                  onClick={() => setMode(m.value)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '8px', border: mode === m.value ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', background: mode === m.value ? '#f0f5fc' : '#ffffff', cursor: 'pointer', textAlign: 'left', width: '100%', fontFamily: 'inherit' }}
                 >
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                    mode === m.id ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-gray-300'
-                  }`} />
+                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: mode === m.value ? '1.5px solid #2a5298' : '1.5px solid #d1d5db', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {mode === m.value && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2a5298' }} />}
+                  </div>
                   <div>
-                    <span className="font-medium text-sm text-[var(--foreground)]">{m.label}</span>
-                    <span className="text-xs text-[var(--text-muted)] ml-2">{m.desc}</span>
+                    <div style={{ fontSize: '14px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{m.label}</div>
+                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>{m.desc}</div>
                   </div>
                 </button>
               ))}
             </div>
-          </div>
-        ) : null}
-
-        {/* Specialization */}
-        {level === 'ACC' && (
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)] mb-1">
-              考试板块 <span className="font-normal text-[var(--text-muted)]">（可选，不选则随机）</span>
-            </p>
-            <div className="flex flex-col gap-2 mt-2">
-              {ACC_DOMAINS.map((d) => (
-                <button
-                  key={d.code}
-                  onClick={() => toggleACCDomain(d.code)}
-                  className={`flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                    selectedCCs.includes(d.code)
-                      ? 'border-[var(--primary)] bg-[#e8f0f8]'
-                      : 'border-[var(--border)] hover:border-[var(--primary-light)]'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                    selectedCCs.includes(d.code) ? 'border-[var(--primary)] bg-[var(--primary)]' : 'border-gray-300'
-                  }`} />
-                  <div>
-                    <span className="font-medium text-sm text-[var(--foreground)]">{d.label}</span>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{d.desc}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          </>
         )}
 
         {(level === 'PCC' || level === 'MCC') && (
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)] mb-3">专项练习</p>
-            <div className="flex flex-col gap-3">
-              {CC_GROUPED_DOMAINS.map((domain) => (
-                <div
-                  key={domain.label}
-                  className="flex rounded-xl overflow-hidden bg-white shadow-sm border border-gray-100"
-                >
-                  {/* colored left bar */}
-                  <div className="w-1 flex-shrink-0 rounded-l-xl" style={{ backgroundColor: domain.color }} />
-                  <div className="flex-1 px-4 py-3">
-                    <p className="text-sm font-semibold mb-2" style={{ color: domain.color }}>
-                      {domain.label}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {domain.ccs.map((ccId) => {
-                        const cc = COMPETENCIES.find(c => c.id === ccId)!
-                        const isSelected = selectedCCs.includes(ccId)
+          <>
+            <div style={{ height: '0.5px', background: '#f3f4f6', marginBottom: '32px' }} />
+            <p style={{ fontSize: '11px', fontWeight: 500, letterSpacing: '1.2px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '6px' }}>专项练习</p>
+            <p style={{ fontSize: '12px', color: '#d1d5db', marginBottom: '14px' }}>可多选，不选则随机混合出题</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '32px' }}>
+              {DOMAINS.map(domain => {
+                const anyChecked = domain.ccs.some(c => checkedCCs.has(c.code))
+                return (
+                  <div
+                    key={domain.key}
+                    onClick={() => toggleDomain(domain.ccs)}
+                    style={{ border: anyChecked ? '1.5px solid #2a5298' : '0.5px solid #e5e7eb', borderRadius: '12px', padding: '14px 16px', background: '#ffffff', cursor: 'pointer' }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: '#111827', marginBottom: '2px' }}>{domain.name}</div>
+                    <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px' }}>{domain.en}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {domain.ccs.map(cc => {
+                        const isChecked = checkedCCs.has(cc.code)
                         return (
-                          <button
-                            key={ccId}
-                            onClick={() => toggleCC(ccId)}
-                            className="text-xs px-3 py-1.5 rounded-full border transition-all"
-                            style={isSelected ? {
-                              borderColor: domain.color,
-                              backgroundColor: `${domain.color}18`,
-                              color: domain.color,
-                              fontWeight: 600,
-                            } : {}}
+                          <div
+                            key={cc.code}
+                            onClick={e => toggleCC(cc.code, e as React.MouseEvent)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', color: isChecked ? '#1a3a6b' : '#6b7280', background: isChecked ? '#eef3fb' : 'transparent', border: isChecked ? '0.5px solid #b8d0f0' : '0.5px solid transparent', cursor: 'pointer', userSelect: 'none' }}
                           >
-                            {isSelected ? cc.label : <span className="text-[var(--text-muted)]">{cc.label}</span>}
-                          </button>
+                            <div style={{ width: '14px', height: '14px', borderRadius: '3px', border: isChecked ? '1px solid #2a5298' : '1px solid #d1d5db', background: isChecked ? '#2a5298' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#fff' }}>
+                              {isChecked ? '✓' : ''}
+                            </div>
+                            <span style={{ fontSize: '10px', fontWeight: 500, color: isChecked ? '#2a5298' : '#9ca3af', minWidth: '26px' }}>{cc.code}</span>
+                            <span>{cc.name}</span>
+                          </div>
                         )
                       })}
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
-            {selectedCCs.length > 0 ? (
-              <p className="text-xs mt-2" style={{ color: CC_GROUPED_DOMAINS.find(d => d.ccs.includes(selectedCCs[0]))?.color ?? 'var(--primary)' }}>
-                已选：{selectedCCs.map(id => COMPETENCIES.find(c => c.id === id)?.label ?? id).join('、')}
-              </p>
-            ) : (
-              <p className="text-xs text-[var(--text-muted)] mt-2">可多选，不选则随机混合出题</p>
-            )}
-          </div>
+          </>
         )}
 
-        {/* Welcome card */}
-        <div className="px-4 py-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
-          <p className="text-sm font-semibold text-blue-800 mb-2">你可以这样使用：</p>
-          <ul className="space-y-1 text-xs text-blue-700">
-            <li>· 按级别练习：ACC知识类 / PCC·MCC情景题</li>
-            <li>· 指定板块练习：选择对应的考试板块或能力项</li>
-            <li>· 对话指定出题：直接说"给我出CC7的题"或"出一道伦理题"</li>
-            <li>· 分析薄弱点：说"分析我的薄弱点"</li>
-            <li>· 生成学习报告：说"给我学习报告"（每10题自动触发）</li>
-            <li>· 补考专项练习：选择上次考试未达标的板块定向练习</li>
-          </ul>
-        </div>
-
         <button
-          onClick={() => level && effectiveMode && onStart(level, effectiveMode, selectedCCs.length > 0 ? selectedCCs.join(',') : null)}
-          disabled={!canStart}
-          className="btn-primary w-full"
+          onClick={() => onStart(mode, Array.from(checkedCCs))}
+          style={{ width: '100%', padding: '13px', borderRadius: '8px', border: 'none', background: '#1a3060', color: '#e8f0fc', fontSize: '15px', fontWeight: 500, cursor: 'pointer', letterSpacing: '0.3px', fontFamily: 'inherit' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#22409a')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#1a3060')}
         >
           开始练习
         </button>
+
       </div>
     </div>
   )
@@ -1059,8 +1054,12 @@ export default function ClientPage() {
     router.push('/')
   }
 
-  function handleStart(level: Level, mode: Mode, competency: string | null) {
-    setConfig({ level, mode, competency })
+  function handleStart(mode: string, selectedCCs: string[]) {
+    setConfig({
+      level: activatedLevel!,
+      mode: mode as Mode,
+      competency: selectedCCs.length > 0 ? selectedCCs.join(',') : null,
+    })
     setPhase('chat')
   }
 
@@ -1079,5 +1078,5 @@ export default function ClientPage() {
 
   if (!activatedLevel) return null
 
-  return <SelectionScreen level={activatedLevel} onStart={handleStart} />
+  return <SelectionScreen level={activatedLevel} studentName={studentName} onStart={handleStart} />
 }
