@@ -289,7 +289,7 @@ function SelectionScreen({
 
         {/* 0. 标题 */}
         <div style={{ marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 500, color: '#1a3060', letterSpacing: '-0.5px', margin: 0 }}>ICF 笔试练习平台</h1>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#1a3060', letterSpacing: '-0.5px', margin: 0, textAlign: 'center' }}>ICF 笔试练习平台</h1>
         </div>
 
         {/* 1. 级别徽章 */}
@@ -307,7 +307,6 @@ function SelectionScreen({
           <p style={{ fontSize: '13px', fontWeight: 500, color: '#1a3060', marginBottom: '10px' }}>你可以这样使用：</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {[
-              ['按级别练习', 'ACC 知识类 / PCC·MCC 情景题'],
               ['指定板块练习', '选择对应的考试板块或能力项'],
               ['对话指定出题', '直接说「给我出 CC7 的题」或「出一道伦理题」'],
               ['分析薄弱点', '说「分析我的薄弱点」'],
@@ -326,7 +325,7 @@ function SelectionScreen({
         </div>
 
         {/* 3. 练习模式 */}
-        <p style={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>练习模式</p>
+        <p style={{ fontSize: '15px', fontWeight: 500, color: '#9ca3af', marginBottom: '10px' }}>练习模式</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '32px' }}>
           {MODES.map(m => (
@@ -350,7 +349,7 @@ function SelectionScreen({
         <div style={{ height: '0.5px', background: '#f3f4f6', marginBottom: '32px' }} />
 
         {/* 5. 专项练习 */}
-        <p style={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '6px' }}>专项练习</p>
+        <p style={{ fontSize: '15px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>专项练习</p>
         <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '14px' }}>可多选，不选则随机混合出题</p>
 
         {/* 6. 四大领域网格 */}
