@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/generate-question/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/activate/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}
